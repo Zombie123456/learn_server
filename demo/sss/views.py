@@ -1,13 +1,16 @@
 from rest_framework import mixins, viewsets
-from sss.models import Member, AlipayCode
 from rest_framework.response import Response
 from django.http import HttpResponseForbidden
-from sss.serializer import MemberRegisterSerializer, SendMessageSerializer
 from django.utils.translation import ugettext as _
 from django.contrib.auth.models import User
+
+from sss.models import (Member,
+                        AlipayCode)
 from demo.utils import get_ip_addr, is_black_listed
 from demo.lib import constans
 from demo.throttling import CustomAnonThrottle
+from sss.serializer import (MemberRegisterSerializer,
+                            SendMessageSerializer)
 
 
 class MemberRegisterViewSet(mixins.CreateModelMixin,

@@ -1,13 +1,15 @@
+import re
+import random
+
 from rest_framework import serializers
-from sss.models import Member, AlipayCode
 from django.contrib.auth.models import User, Group
 from django.utils.translation import ugettext as _
-from demo.utils import get_ip_addr, vertify_code
+
 from .message import AlipayMessageProvider
-import random
+from demo.utils import get_ip_addr, vertify_code
 from loginsvc.views import is_self_phonenum
 from demo.lib import constans
-import re
+from sss.models import Member, AlipayCode
 
 
 class MemberRegisterSerializer(serializers.ModelSerializer):
@@ -37,7 +39,6 @@ class MemberRegisterSerializer(serializers.ModelSerializer):
         validated_data = {}
         if request.method == 'POST':
 
-            # check if username is already in used
             user_check = User.objects.filter(username=data.get('username'))
 
             if user_check:
@@ -56,7 +57,6 @@ class MemberRegisterSerializer(serializers.ModelSerializer):
                 })
             validated_data['password'] = password
             validated_data['phone'] = data.get('phone')
-            # get/set register_ip
             ipaddr = get_ip_addr(request)
             validated_data['register_ip'] = ipaddr
 
@@ -75,7 +75,6 @@ class MemberRegisterSerializer(serializers.ModelSerializer):
                 username=validated_data['username'],
                 password=password)
 
-            # add group to user
             member_grp = Group.objects.filter(name='member_grp').first()
 
             user.groups.add(member_grp)

@@ -1,6 +1,7 @@
 from configset.models import GlobalPreferences
-from sss.models import AlipayCode
 from oauth2_provider.models import AccessToken
+
+from sss.models import AlipayCode
 
 
 def get_ip_addr(request):

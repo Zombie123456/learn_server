@@ -4,6 +4,7 @@ import random
 import requests
 import re
 import string
+
 from django.contrib.auth.models import Group
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -18,10 +19,15 @@ from django.views.decorators.csrf import csrf_exempt
 from oauth2_provider.models import AccessToken, Application, RefreshToken
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.throttling import AnonRateThrottle
+
 from loginsvc.permissions import IsMember
 from sss.models import Member
 from demo.lib import constans
-from demo.utils import get_user_type, get_ip_addr, vertify_code, is_black_listed, parse_request_for_token
+from demo.utils import (get_user_type,
+                        get_ip_addr,
+                        vertify_code,
+                        is_black_listed,
+                        parse_request_for_token)
 
 
 logger = logging.getLogger(__name__)
@@ -34,10 +40,6 @@ def random_token_generator(length):
 
 
 def generate_token(string_0, string_1):
-    """
-    @brief
-        Returns a random string to serve as an Oauth AccessToken value
-    """
 
     salt = random_token_generator(4)
     token = f'{string_0}.{string_1}.{salt}'
@@ -55,10 +57,6 @@ def generate_response(code, msg=None, data=None):
 
 @csrf_exempt
 def logout(request):
-    """
-    @brief
-        Deletes Access Token upon user logout
-    """
 
     if request.method != 'POST':
         return generate_response(constans.NOT_ALLOWED, _('Not Allowed'))
@@ -74,7 +72,6 @@ def logout(request):
     try:
         user = token_obj.user
         user_type = get_user_type(user)
-        # deleting AccessToken will also delete RefreshToken
         token_obj.delete()
 
         if user_type == 'staff':
@@ -103,14 +100,12 @@ def current_user(request):
 @permission_classes([])
 @csrf_exempt
 def refresh_access_token(request):
-    # Refresh the access token
     refresh_token = request.data.get('refresh_token') or \
         request.POST.get('refresh_token')
     print(refresh_token)
     refresh_token_obj = \
         RefreshToken.objects.filter(token=refresh_token).first()
 
-    # Check whether if the refresh token exists
     if not refresh_token_obj:
         return generate_response(constans.NOT_OK,
                                  _('Please make sure you are logged in'))
@@ -172,7 +167,6 @@ def login(request):
         return HttpResponseForbidden('IP is not allowed')
     sessionid = request.COOKIES.get('sessionid')
 
-    # create session if cannot find it in cookies or cache
     if not sessionid or cache.get(sessionid) is None:
         try:
             request.session.create()
@@ -183,7 +177,6 @@ def login(request):
 
     data = request.POST or QueryDict(request.body)  # to capture data in IE
 
-    # verify username and password
     try:
         user = authenticate(username=data['username'],
                             password=data['password'],
@@ -192,16 +185,13 @@ def login(request):
         return generate_response(constans.NOT_ALLOWED,
                                  _('Not Allowed Login'))
 
-    # get user type (admin, staff, None)
     user_type = get_user_type(user)
     url_name = resolve(request.path).url_name
-    # if user login to wrong website or username/password is invalid
     if (url_name == 'member_login' and user_type is not 'member') or \
             (url_name == 'dashboard_login' and user_type is 'member'):
         msg = _('Invalid username or password')
         return set_auth(sessionid, msg)
     if user_type in {'staff', 'admin'}:
-        # otp required for staff and admin
         otp_token = data.get('otp_token', None)
         if user_type is not None:
             if otp_token is None:
@@ -218,14 +208,12 @@ def login(request):
                     msg = _('Invalid OTP Token')
                     return set_auth(sessionid, msg)
 
-    # # check if user account is active
     is_active = __get_status(user, user_type)
 
     if is_active:
         cache.delete(sessionid)
 
         token = create_token(user, user_type)
-        # record login
         if user_type == 'staff' or user_type == 'member':
             try:
                 staff = user.staff_user
@@ -306,18 +294,11 @@ def set_auth(sessionid, message):
 
 
 def create_token(user, user_type):
-    """
-    @brief
-        A more flexible way of handling and creating Oauth AccessTokens
-    """
-
     expire_seconds = settings.OAUTH2_PROVIDER['ACCESS_TOKEN_EXPIRE_SECONDS']
     scopes = settings.OAUTH2_PROVIDER['SCOPES']
 
-    # Get application based on user role
     application = __get_application(user.groups.all())
 
-    # delete old tokens, if any
     AccessToken.objects.filter(user=user, application=application).delete()
 
     expires = timezone.localtime() + timezone.timedelta(seconds=expire_seconds)
@@ -358,12 +339,10 @@ def __get_status(user, user_type):
 
 
 def force_logout(user):
-    # Logout immediately
     token_obj = AccessToken.objects.filter(user=user).first()
     try:
         user = token_obj.user
         user_type = get_user_type(user)
-        # deleting AccessToken will also delete RefreshToken
         token_obj.delete()
         if user_type == 'staff':
             staff = user.staff_user
@@ -375,8 +354,6 @@ def force_logout(user):
 
 
 def __get_application(user_groups):
-    '''
-    '''
     if Group.objects.get(name='member_grp') in user_groups:
         return Application.objects.get(name="lion")
     else:
@@ -384,7 +361,6 @@ def __get_application(user_groups):
 
 
 def get_valid_token(request, try_cookies=False, select_related_user=True):
-    # get access token string
     auth_str = request.META.get('HTTP_AUTHORIZATION') or ''
     auth_segments = auth_str.split(' ')
     if len(auth_segments) >= 2 and auth_segments[0] == 'Bearer':
@@ -394,11 +370,6 @@ def get_valid_token(request, try_cookies=False, select_related_user=True):
     else:
         return None
 
-    # get access token object
-    # Note:
-    # AccessToken.token has no unique constraint.
-    # Using get could raise MultipleObjectsReturned exception.
-    # Use filter().first() instead.
     if select_related_user:
         access_token = AccessToken.objects.select_related('user') \
             .filter(token=access_token_str) \

@@ -1,9 +1,11 @@
+import logging
+from datetime import datetime
+
+from oauth2_provider.models import AccessToken, RefreshToken
+
 from .models import AlipayCode, Member
 from demo.celery import app
-from oauth2_provider.models import AccessToken, RefreshToken
-from datetime import datetime
 from django.contrib.auth.models import User
-import logging
 
 
 logger = logging.getLogger(__name__)
