@@ -93,8 +93,7 @@ ENV/
 # Rope project settings
 .ropeproject
 
-
-/manage.py
+mysqldata/
 
 #migration files
 */migrations/*
@@ -104,6 +103,4 @@ ENV/
 db.sqlite3
 
 # Upload Folder
-upload/*
 media/*
-static/*

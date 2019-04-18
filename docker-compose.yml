@@ -7,8 +7,14 @@ services:
       image: mysql:5.7.25
       environment:
         - MYSQL_ROOT_PASSWORD=pass1234
+      command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
       volumes:
         - ./mysqldata:/var/lib/mysql
+    redis:
+      restart: always
+      image: redis:5.0.4
+      volumes:
+        - redis-data:/data
     nginx:
       restart: always
       image: nginx:1.15.9
@@ -26,6 +32,13 @@ services:
         - target: "80"
           published: "80"
           mode: host
+    rabbitmq:
+      restart: always
+      image: rabbitmq:3.7.8-management
+      env_file:
+      - ./env/.rabbitmq
+      ports:
+      - 15673:15672
     demo:
       build: ./demo
       restart: always
@@ -33,6 +46,15 @@ services:
         - ./demo:/docker_api
       depends_on:
         - for_mysql
+    demo-celery:
+      build: ./demo
+      restart: always
+      volumes:
+        - ./demo:/docker_api
+      depends_on:
+        - for_mysql
+      entrypoint: /docker_api/celery-entrypoint.sh
 
 volumes:
     mysqldata:
+    redis-data:

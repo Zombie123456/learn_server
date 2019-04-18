@@ -23,10 +23,27 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '52$^wtur+o)9+&ee%+5h@qg&aj9_cz!t#_zw66n)x5-04av6w6'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+TIME_ZONE = 'Asia/Shanghai'  # Always change this to set the log timestamps correctly
+
+CELERY_RESULT_BACKEND = 'rpc://'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ROUTES = {
+    'deal_overdue': {
+        'queue': 'others',
+        'routing_key': 'others'
+    }
+}
+
+CELERYBEAT_SCHEDULE = {
+    'delete_expired_token_every_minute': {
+        'task': 'delete_expired_token',
+        'schedule': os.environ.get('delete_expired_token_every_minute', 60),
+    }
+}
 
 # Application definition
 
@@ -38,6 +55,35 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 ]
+
+RABBITMQ_DEFAULT_USER = os.environ.get('RABBITMQ_DEFAULT_USER', 'demo')
+RABBITMQ_DEFAULT_PASS = os.environ.get('RABBITMQ_DEFAULT_PASS', 'demo')
+RABBITMQ_DEFAULT_VHOST = os.environ.get('RABBITMQ_DEFAULT_VHOST', 'demo')
+RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+# Adjust for Google Cloud SDK Image
+BROKER_URL = (f'amqp://{RABBITMQ_DEFAULT_USER}:{RABBITMQ_DEFAULT_PASS}'
+              f'@{RABBITMQ_HOST}:5672/{RABBITMQ_DEFAULT_VHOST}')
+BROKER_HEARTBEAT = int(os.environ.get('RABBITMQ_HOST', 0))
+
+START_APP = [
+    'sss',
+    'loginsvc'
+]
+
+INSTALLED_APPS += START_APP
+
+THIRD_PARTY_APPS = [
+    'rest_framework',
+    'oauth2_provider',
+    'captcha',
+    'configset'
+]
+
+AUTHENTICATION_BACKENDS = (
+    'loginsvc.ph_login.EmailBackend',
+)
+
+INSTALLED_APPS += THIRD_PARTY_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -67,11 +113,38 @@ TEMPLATES = [
     },
 ]
 
+OAUTH2_PROVIDER = {
+    # this is the list of available scopes
+    'SCOPES': {'read': 'Read scope', 'write': 'Write scope'},
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 7200,  # 2 hour
+    'REFRESH_TOKEN_EXPIRE_SECONDS': 86400,  # 24 hour
+    'OAUTH_DELETE_EXPIRED': True,
+}
+
 WSGI_APPLICATION = 'demo.wsgi.application'
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
+    ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS':
+        'rest_framework.pagination.LimitOffsetPagination',
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ),
+    'NON_FIELD_ERRORS_KEY': 'error_code'  # RESPONSE/ERROR RENDERING
+}
 
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
+
+DEFAULT_REQUEST_RATE_LIMIT = '5/minute'
 
 DATABASES = {
     'default': {
@@ -83,16 +156,20 @@ DATABASES = {
         'PORT': '3306'
     }
 }
+REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')
+REDIS_CACHE_LOCATION = '{}://{}:6379'.format(REDIS_HOST, REDIS_HOST)
 
-# CACHES = {
-#     "default": {
-#         "BACKEND": "django_redis.cache.RedisCache",
-#         "LOCATION": "redis://127.0.0.1:6379/1",
-#         "OPTIONS": {
-#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-#         }
-#     }
-# }
+CACHES = {
+    'default': {
+        "BACKEND": 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_CACHE_LOCATION,
+        'TIMEOUT': 259200,
+        'OPTIONS': {
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'IGNORE_EXCEPTIONS': True,
+        }
+    },
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
@@ -118,7 +195,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
@@ -134,3 +211,54 @@ STATIC_ROOT = 'static'
 STATIC_URL = '/static/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'upload')
 MEDIA_URL = '/upload/'
+
+
+log_level = 'DEBUG'
+LOGGING = {
+           'version': 1,
+           'disable_existing_loggers': False,
+           'formatters': {
+               'verbose': {
+                   'format': '[%(asctime)s][%(name)s:%(lineno)s][%(levelname)s] %(message)s',
+                   'datefmt': '%Y/%b/%d %H:%M:%S'
+               },
+               'colored': {'()': 'colorlog.ColoredFormatter',
+                           'format': '[%(log_color)s%(asctime)s%(reset)s][%(name)s:%(lineno)s][%(log_color)s%(levelname)s%(reset)s] %(message)s',
+                           'datefmt': '%Y/%b/%d %H:%M:%S',
+                           'log_colors': {'DEBUG': 'cyan',
+                                          'INFO': 'green',
+                                          'WARNING': 'bold_yellow',
+                                          'ERROR': 'red',
+                                          'CRITICAL': 'red,bg_white'},
+                           'secondary_log_colors': {},
+                           'style': '%'},
+           },
+           'handlers': {
+               'console': {
+                   'level': log_level,
+                   'class': 'logging.StreamHandler',
+                   'formatter': 'colored'
+               },
+               'mail_admins': {
+                   'level': 'ERROR',
+                   'class': 'django.utils.log.AdminEmailHandler',
+               },
+           },
+           'loggers': {
+               'django': {
+                   'handlers': ['console'],
+                   'propagate': True,
+               },
+               'django.request': {
+                   'handlers': ['mail_admins'],
+                   'level': 'ERROR',
+               },
+           }
+}
+
+__app_logging = {'handlers': ['console', ],
+                 'level': log_level,
+                 'propagate': True}
+
+for proj_app in START_APP:
+    LOGGING.get('loggers').update({proj_app: __app_logging})
