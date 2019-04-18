@@ -41,8 +41,8 @@ def get_user_type(user):
 
 def vertify_code(phone, code):
     try:
-        AlipayCode.objects.get(status=1, phone=phone, code=code)
-        return True
+        a_code = AlipayCode.objects.get(status=1, phone=phone, code=code)
+        return a_code
     except:
         return False
 
