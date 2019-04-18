@@ -100,7 +100,7 @@ class SendMessageSerializer(serializers.ModelSerializer):
                     'code': constans.FIELD_ERROR,
                     'error': [{'phone_field': _('need phone filed')}]
                 })
-            if not code_type == 'register' and not is_self_phonenum(request, phone):
+            if not code_type == 'register' or not is_self_phonenum(request, phone):
                 raise serializers.ValidationError({
                     'code': constans.FIELD_ERROR,
                     'error': [{'phone_field': _('not self phone')}]
