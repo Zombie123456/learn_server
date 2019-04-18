@@ -3,7 +3,7 @@ from django.core.validators import RegexValidator
 from django.contrib.auth.models import User, Group
 
 
-STATUS_OPTIONS = (
+MEMBER_STATUS_OPTIONS = (
     (0, 'Rejected'),
     (1, 'Active'),
     (2, 'Inactive'),
@@ -11,18 +11,13 @@ STATUS_OPTIONS = (
 )
 
 
-AlipayCode_STATUS_OPTIONS = (
+STATUS_OPTIONS = (
     (0, 'Inactive'),
     (1, 'Active'),
 )
 
 
 class Member(models.Model):
-    '''
-    @class Member
-    @brief
-        Member model class
-    '''
 
     user = models.OneToOneField(User,
                                 null=True, blank=True,
@@ -42,7 +37,7 @@ class Member(models.Model):
 
     status = models.IntegerField(default=1,
                                  null=True, blank=True,
-                                 choices=STATUS_OPTIONS)
+                                 choices=MEMBER_STATUS_OPTIONS)
     register_ip = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now=False, auto_now_add=True,
                                       db_index=True)
@@ -68,7 +63,7 @@ class AlipayAccount(models.Model):
     accesskeyid = models.CharField(max_length=50, blank=True, null=True)
     secret_key = models.CharField(max_length=50, blank=True, null=True)
     status = models.IntegerField(default=1, null=True, blank=True,
-                                 choices=AlipayCode_STATUS_OPTIONS)
+                                 choices=STATUS_OPTIONS)
     sign_name = models.CharField(max_length=50, blank=True, null=True)
     template_code = models.CharField(max_length=50, blank=True, null=True)
     expired_in = models.IntegerField(null=True, blank=True)
@@ -85,8 +80,57 @@ class AlipayCode(models.Model):
                              )])
     code = models.CharField(max_length=10, blank=True, null=True)
     status = models.IntegerField(default=1, null=True, blank=True,
-                                 choices=AlipayCode_STATUS_OPTIONS)
+                                 choices=STATUS_OPTIONS)
     alipay_account = models.ForeignKey(AlipayAccount,
                                        null=True, blank=True,
                                        on_delete=models.SET_NULL)
 
+
+class StaffPermission(models.Model):
+    display_name = models.CharField(max_length=50, null=True, blank=True)
+    name = models.CharField(max_length=200, null=True, blank=True)
+    description = models.CharField(max_length=200, null=True, blank=True)
+    key = models.CharField(max_length=50, null=False, blank=False, unique=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        db_table = 'permission_staffpermission'
+        permissions = (('list_staffpermission',
+                        'Can list staff permission'),)
+
+    def __str__(self):
+        return self.display_name
+
+
+class Staff(models.Model):
+    user = models.OneToOneField(User, null=True,
+                                blank=True,
+                                related_name='staff_user',
+                                on_delete=models.SET_NULL)
+    username = models.CharField(unique=True, max_length=100)
+    nickname = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(max_length=70, blank=True, null=True)
+    memo = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, null=True,
+                                   blank=True,
+                                   related_name='staff_created_by',
+                                   on_delete=models.SET_NULL)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(User,
+                                   null=True,
+                                   blank=True,
+                                   related_name='staff_updated_by',
+                                   on_delete=models.SET_NULL)
+    is_logged_in = models.BooleanField(default=False)
+    last_logged_in = models.DateTimeField(null=True, blank=True)
+    status = models.IntegerField(default=1, choices=STATUS_OPTIONS)
+    perms = models.ManyToManyField(StaffPermission,
+                                   related_name='staffperms')
+
+    class Meta:
+        db_table = 'account_staff'
+        permissions = (('list_staff', 'Can list staff'),)
+
+    def __str__(self):
+        return self.username
